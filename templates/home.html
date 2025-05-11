@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Home</title>
+</head>
+<body>
+    <div>
+    <h1>This is the Home page</h1>
+
+    <h3>{{ request.user.username }}</h3>
+
+    <a href="{% url 'logout' %}">
+    <button>LOGOUT</button>
+    </a>
+
+    <a href="{% url 'create_profile' %}">
+        <button>ADD A PROFILE</button>
+    </a>
+
+
+    <a href="{% url 'searchdbpage' %}">
+        <button>SEARCH DATABASE</button>
+    </a>
+
+
+    <a href="{% url 'comparefaces' %}">
+        <button>COMPARE TWO IMAGES</button>
+    </a>
+
+    <a href="{% url 'videoscanning' %}">
+        <button>VIDEO SCANNING PAGE</button>
+    </a>
+
+    </div>
+
+</body>
+</html>

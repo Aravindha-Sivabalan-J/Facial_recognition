@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VIDEO FACE FINDER</title>
+</head>
+<body>
+    {% load custom_tags %}
+    <form action="" method="POST" enctype="multipart/form-data" >
+        {% csrf_token %}
+        <label>UPLOAD YOUR VIDEO FILE (file size should not exceed 20MB)</label><br><br><br>
+        <input type="file" name="video" accept="video/*"><br><br><br>
+        <button>SCAN VIDEO FOR FACE</button>
+    </form>
+
+    {% for snapshot, match_set in combined %}
+    <div style="margin-bottom: 20px;">
+        <h3>Snapshot:</h3>
+        <img src="/{{ snapshot }}" style="height: 200px;"><br>
+
+        <h4>Matching Faces:</h4>
+        {% for match in match_set %}
+        <img src="/{{ match.image }}" style="height: 150px; margin-right: 10px;">
+        <p>Distance: {{ match.distance }}</p>
+        {% endfor %}
+    </div>
+    {% endfor %}
+
+</body>
+</html>

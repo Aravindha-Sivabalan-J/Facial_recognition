@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    
+    <style>
+        /* In your <style> tag or separate CSS file */
+        .drop-zone {
+            max-width: 200px; /* Adjust size as needed */
+            height: 150px;    /* Adjust size as needed */
+            padding: 25px;
+            display: flex; /* Use flexbox for centering content */
+            align-items: center; /* Center vertically */
+            justify-content: center; /* Center horizontally */
+            text-align: center;
+            font-family: "Quicksand", sans-serif; /* Example font */
+            font-weight: 500;
+            font-size: 15px;
+            cursor: pointer; /* Show pointer cursor on hover */
+            color: #cccccc; /* Light gray text */
+            border: 2px dashed #cccccc; /* Dashed border */
+            border-radius: 10px; /* Rounded corners */
+            margin-bottom: 20px; /* Space between the two drop zones */
+        }
+
+        .drop-zone--over {
+            border-style: solid; /* Change border style when dragging over */
+            box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.3); /* Add a subtle shadow */
+            color: #000000; /* Change text color */
+        }
+
+        .drop-zone__input {
+            display: none; /* Hide the default file input button */
+        }
+
+        .drop-zone__thumb {
+            width: 100%;
+            height: 100%;
+            border-radius: 10px;
+            overflow: hidden; /* Hide parts of the image outside the border-radius */
+            background-color: #cccccc; /* Placeholder background */
+            background-size: cover; /* Cover the area */
+            position: relative; /* Needed for positioning content inside */
+        }
+
+        .drop-zone__thumb::after {
+            content: attr(data-label); /* Show filename as text */
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            padding: 5px 0;
+            color: #ffffff; /* White text */
+            background: rgba(0, 0, 0, 0.7); /* Semi-transparent black background */
+            font-size: 12px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <!-- <form method="POST" action="{% url 'comparefaces' %}" enctype="multipart/form-data">
+        {% csrf_token %}
+        {{ compareform.as_p }}
+        <input type="submit" value="REGISTER">
+    </form> -->
+    <!-- <div class="drop-zone" id="drop-zone-image1" style="padding: 20px; border: 1px solid red; margin: 15px;">
+            <span class="drop-zone__prompt">DRAG AND DROP OR CLICK TO UPLOAD IMAGE 1</span>
+            <input type="file" id="image1" name="image1" accept="image/*" class="drop-zone__input">
+        </div> -->
+
+
+    <form method="POST" action="{% url 'comparefaces' %}" enctype="multipart/form-data">
+        {% csrf_token %}
+        <div class="drop-zone" id="drop-zone_image2" style="padding: 20px; border: 1px solid red; margin: 15px;">
+            <span class="drop-zone__prompt">DRAG AND DROP OR CLICK TO UPLOAD IMAGE 2</span>
+            <input type="file" id="images" name="images" class="drop-zone__input" multiple accept="image/*">
+        </div>
+        <button type="submit">Compare Faces</button>
+    </form>
+    
+                <!-- //     document.querySelectorAll(".drop-zone__input").forEach(inputElement => {
+        //         const dropZoneElement = inputElement.closest(".drop-zone");
+        //         const formElement = inputElement.form;
+        //         dropZoneElement.addEventListener("click", () => {
+        //             inputElement.click();
+        //         });
+        //         inputElement.addEventListener("change", function(){
+        //             console.log("Files selected via click:", this.files);
+        //             if (this.files.length > 0) {
+        //                 inputElement.files = this.files;
+        //                 updateDropZoneThumbnail(dropZoneElement, this.files[0])
+        //             }
+        //         });
+        //         dropZoneElement.addEventListener("dragover", e => {
+        //             e.preventDefault();
+        //             dropZoneElement.classList.add("drop-zone--over");
+        //         });
+        //         ["dragleave", "dragend"].forEach(type => {
+                    
+        //             dropZoneElement.addEventListener(type, e => {
+        //                 dropZoneElement.classList.remove("drop-zone--over");
+        //             })
+        //         });
+        //         dropZoneElement.addEventListener("drop", e => {
+        //             e.preventDefault();
+        //             console.log("Files dropped:", e.dataTransfer.files);
+        //             if (e.dataTransfer.files.length > 0) {
+        //                 inputElement.files = e.dataTransfer.files;
+        //                 updateDropZoneThumbnail(dropZoneElement, e.dataTransfer.files[0]);
+        //             }
+        //             dropZoneElement.classList.remove("drop-zone--over");
+        //         });
+        //         if (formElement) { // Ensure the input is inside a form
+        //         formElement.addEventListener('submit', function(event) {
+        //             // Temporarily prevent default submission to check files property
+        //             event.preventDefault();
+        //             console.log("--- Checking files before submission ---");
+        //             console.log("Input element:", inputElement);
+        //             console.log("Input element files property:", inputElement.files);
+        //             console.log("Number of files attached:", inputElement.files ? inputElement.files.length : 0);
+        //             console.log("--- End file check ---");
+
+        //             // *** To actually submit after checking, REMOVE event.preventDefault(); ***
+        //             // This line must be removed or commented out to allow actual submission
+        //             // After removing preventDefault, you can check the Network tab again (may still need curl)
+        //         });
+        //     }
+        // });
+            
+        // function updateDropZoneThumbnail(dropZoneElement, file) {
+        //     let thumbnailElement = dropZoneElement.querySelector(".drop-zone__thumb");
+        //     const promptElement = dropZoneElement.querySelector(".drop-zone__prompt");
+        //     if (promptElement) {
+        //         promptElement.style.display = 'none';
+        //     }
+        //     if (!thumbnailElement) {
+        //         thumbnailElement = document.createElement("div");
+        //         thumbnailElement.classList.add("drop-zone__thumb");
+        //         dropZoneElement.appendChild(thumbnailElement);
+        //     }
+        //     thumbnailElement.dataset.label = file.name
+        //     console.log("File type:", file.type);
+        //     if (file.type.startsWith("/image")){
+        //         const reader = new FileReader()
+        //         reader.readAsDataURL(file)
+        //         reader.onload = () =>{
+        //             console.log("FileReader onload finished. Setting background.");
+        //             print("FileReader onload finished. Setting background.")
+        //             print (reader.result.substring(0, 50))
+        //             thumbnailElement.style.backgroundImage = `url('${reader.result}')`
+        //             thumbnailElement.style.backgroundColor = '';
+        //         }
+        //     } else {
+        //         thumbnailElement.style.backgroundImage = null;
+        //         thumbnailElement.style.backgroundColor = '#cccccc';
+        //     }
+        // } -->
+
+<!-- <script>
+    // Use a DataTransfer object to manage the list of files selected/dropped
+    // This allows accumulating files from multiple interactions
+    const dataTransfer = new DataTransfer(); // Requires modern browser support
+
+    document.querySelectorAll(".drop-zone__input").forEach(inputElement => {
+        const dropZoneElement = inputElement.closest(".drop-zone");
+        const formElement = inputElement.form; // Get the parent form element
+
+        // Ensure the input starts with an empty file list managed by our DataTransfer object
+        inputElement.files = dataTransfer.files;
+
+        dropZoneElement.addEventListener("click", () => {
+            inputElement.click();
+        });
+
+        inputElement.addEventListener("change", function(){
+            console.log("Files selected via click:", this.files); // Log selected files
+            if (this.files.length > 0) {
+                // Add selected files to our DataTransfer object
+                for (let i = 0; i < this.files.length; i++) {
+                    dataTransfer.items.add(this.files[i]);
+                }
+                // Assign the accumulated files from DataTransfer back to the input
+                inputElement.files = dataTransfer.files;
+                console.log("Input files after change:", inputElement.files);
+                updateDropZoneThumbnail(dropZoneElement, this.files[0]); // Still just previewing the first file
+            } else {
+                 // If selection is cancelled, clear the files entirely
+                 dataTransfer = new DataTransfer(); // Reset DataTransfer object
+                 inputElement.files = dataTransfer.files; // Assign empty FileList
+                 console.log("Input files after change (cancelled):", inputElement.files);
+                 // You might want to clear the visual thumbnail here too
+                 const thumbnailElement = dropZoneElement.querySelector(".drop-zone__thumb");
+                 if (thumbnailElement) thumbnailElement.remove();
+                 const promptElement = dropZoneElement.querySelector(".drop-zone__prompt");
+                 if (promptElement) promptElement.style.display = 'block'; // Show prompt again
+            }
+        });
+
+        dropZoneElement.addEventListener("dragover", e => {
+            e.preventDefault();
+            dropZoneElement.classList.add("drop-zone--over");
+        });
+
+        ["dragleave", "dragend"].forEach(type => {
+            dropZoneElement.addEventListener(type, e => {
+                dropZoneElement.classList.remove("drop-zone--over");
+            });
+        });
+
+        dropZoneElement.addEventListener("drop", e => {
+            e.preventDefault();
+            console.log("Files dropped:", e.dataTransfer.files); // Log dropped files
+            if (e.dataTransfer.files.length > 0) {
+                // Add dropped files to our DataTransfer object
+                 for (let i = 0; i < e.dataTransfer.files.length; i++) {
+                    dataTransfer.items.add(e.dataTransfer.files[i]);
+                }
+                // Assign the accumulated files from DataTransfer back to the input
+                inputElement.files = dataTransfer.files;
+                console.log("Input files after drop:", inputElement.files);
+                updateDropZoneThumbnail(dropZoneElement, e.dataTransfer.files[0]); // Still just previewing the first file
+            } else {
+                 // If drop is empty, clear the files entirely
+                 dataTransfer = new DataTransfer(); // Reset DataTransfer object
+                 inputElement.files = dataTransfer.files; // Assign empty FileList
+                 console.log("Input files after drop (empty):", inputElement.files);
+                 // You might want to clear the visual thumbnail here too
+                 const thumbnailElement = dropZoneElement.querySelector(".drop-zone__thumb");
+                 if (thumbnailElement) thumbnailElement.remove();
+                 const promptElement = dropZoneElement.querySelector(".drop-zone__prompt");
+                 if (promptElement) promptElement.style.display = 'block'; // Show prompt again
+            }
+            dropZoneElement.classList.remove("drop-zone--over");
+        });
+
+        // Keep the check before submission for debugging
+        if (formElement) {
+            formElement.addEventListener('submit', function(event) {
+                // Temporarily prevent default submission for debugging
+                event.preventDefault();
+                console.log("--- Checking files before submission ---");
+                console.log("Input element:", inputElement);
+                console.log("Input element files property:", inputElement.files); // Check the property we are setting
+                console.log("Number of files attached:", inputElement.files ? inputElement.files.length : 0);
+                console.log("--- End file check ---");
+
+                // AFTER seeing the console output and confirming files are attached:
+                // 1. REMOVE event.preventDefault(); from here
+                // 2. Submit the form normally or programmatically (e.g., event.target.submit())
+            });
+        }
+    });
+
+    // ... (your updateDropZoneThumbnail function remains the same, remember to fix print to console.log) ...
+    function updateDropZoneThumbnail(dropZoneElement, file) {
+       let thumbnailElement = dropZoneElement.querySelector(".drop-zone__thumb");
+       const promptElement = dropZoneElement.querySelector(".drop-zone__prompt");
+
+       // Hide prompt regardless of file existence for consistency when files might be selected
+       if (promptElement) {
+           promptElement.style.display = 'none';
+       }
+
+       // If no file is provided to the thumbnail function (e.g., clearing files), remove thumbnail
+       if (!file) {
+            if (thumbnailElement) thumbnailElement.remove();
+            // You might want to show the prompt again here if you clear files
+            if (promptElement) promptElement.style.display = 'block';
+            return; // Stop processing if no file
+       }
+
+
+       if (!thumbnailElement) {
+           thumbnailElement = document.createElement("div");
+           thumbnailElement.classList.add("drop-zone__thumb");
+           // Append thumbnail first so querySelector finds it next time
+           dropZoneElement.appendChild(thumbnailElement);
+       }
+
+       thumbnailElement.dataset.label = file.name;
+       console.log("File type:", file.type);
+
+       if (file.type && file.type.startsWith("image/")) { // Check file.type exists and starts with image/
+           const reader = new FileReader();
+           reader.readAsDataURL(file);
+           reader.onload = () => {
+               console.log("FileReader onload finished. Setting background.");
+               // console.log(reader.result.substring(0, 50)); // Optional: log part of base64 string
+               thumbnailElement.style.backgroundImage = `url('${reader.result}')`;
+               thumbnailElement.style.backgroundColor = ''; // Clear any default background
+           };
+           reader.onerror = (error) => {
+               console.error("FileReader error:", error);
+               // Handle error visually, e.g., show broken image icon or error message
+           };
+       } else {
+           // Handle non-image files if you allow them (though your accept attribute prevents this)
+           thumbnailElement.style.backgroundImage = null;
+           thumbnailElement.style.backgroundColor = '#cccccc'; // Generic background for non-images
+           thumbnailElement.dataset.label = `Non-image file: ${file.name}`; // Update label
+       }
+    }
+
+</script> -->
+
+
+<!-- <script>
+    // Use a DataTransfer object to manage the list of files selected/dropped
+    const dataTransfer = new DataTransfer(); // Correctly declared as const
+
+    document.querySelectorAll(".drop-zone__input").forEach(inputElement => {
+        const dropZoneElement = inputElement.closest(".drop-zone");
+        const formElement = inputElement.form; // Get the parent form element
+
+        // Ensure the input starts with an empty file list managed by our DataTransfer object
+        inputElement.files = dataTransfer.files; // dataTransfer.files is empty initially
+
+        dropZoneElement.addEventListener("click", () => {
+            inputElement.click();
+        });
+
+        inputElement.addEventListener("change", function(){
+            console.log("Files selected via click:", this.files); // Log selected files
+            if (this.files.length > 0) {
+                // Clear previous files from DataTransfer if needed for single selections
+                // If you want to allow adding more files via multiple clicks, skip the clear
+                // dataTransfer.items.clear(); // <-- Uncomment if each click replaces previous selections
+
+                // Add selected files to our DataTransfer object
+                for (let i = 0; i < this.files.length; i++) {
+                    dataTransfer.items.add(this.files[i]);
+                }
+                // Assign the accumulated files from DataTransfer back to the input
+                inputElement.files = dataTransfer.files;
+                console.log("Input files after change:", inputElement.files);
+                updateDropZoneThumbnail(dropZoneElement, this.files[0]); // Still just previewing the first file
+            } else {
+                 // If selection is cancelled, clear the files entirely
+                 dataTransfer.items.clear(); // <-- CORRECT: Clear items in the existing object
+                 inputElement.files = dataTransfer.files; // Assign empty FileList
+                 console.log("Input files after change (cancelled):", inputElement.files);
+                 // Clear visual thumbnail and show prompt
+                 const thumbnailElement = dropZoneElement.querySelector(".drop-zone__thumb");
+                 if (thumbnailElement) thumbnailElement.remove();
+                 const promptElement = dropZoneElement.querySelector(".drop-zone__prompt");
+                 if (promptElement) promptElement.style.display = 'block'; // Show prompt again
+            }
+        });
+
+        dropZoneElement.addEventListener("dragover", e => {
+            e.preventDefault();
+            dropZoneElement.classList.add("drop-zone--over");
+        });
+
+        ["dragleave", "dragend"].forEach(type => {
+            dropZoneElement.addEventListener(type, e => {
+                dropZoneElement.classList.remove("drop-zone--over");
+            });
+        });
+
+        dropZoneElement.addEventListener("drop", e => {
+            e.preventDefault();
+            console.log("Files dropped:", e.dataTransfer.files); // Log dropped files
+            if (e.dataTransfer.files.length > 0) {
+                // Clear previous files from DataTransfer if needed for new drops replacing previous ones
+                // If you want to allow adding more files via multiple drops, skip the clear
+                // dataTransfer.items.clear(); // <-- Uncomment if each drop replaces previous selections
+
+                // Add dropped files to our DataTransfer object
+                 for (let i = 0; i < e.dataTransfer.files.length; i++) {
+                    dataTransfer.items.add(e.dataTransfer.files[i]);
+                }
+                // Assign the accumulated files from DataTransfer back to the input
+                inputElement.files = dataTransfer.files;
+                console.log("Input files after drop:", inputElement.files);
+                updateDropZoneThumbnail(dropZoneElement, inputElement.files[0]); // Preview the first of the *accumulated* files
+            } else {
+                 // If drop is empty, clear the files entirely
+                 dataTransfer.items.clear(); // <-- CORRECT: Clear items in the existing object
+                 inputElement.files = dataTransfer.files; // Assign empty FileList
+                 console.log("Input files after drop (empty):", inputElement.files);
+                 // Clear visual thumbnail and show prompt
+                 const thumbnailElement = dropZoneElement.querySelector(".drop-zone__thumb");
+                 if (thumbnailElement) thumbnailElement.remove();
+                 const promptElement = dropZoneElement.querySelector(".drop-zone__prompt");
+                 if (promptElement) promptElement.style.display = 'block'; // Show prompt again
+            }
+            dropZoneElement.classList.remove("drop-zone--over");
+        });
+
+        // Keep the check before submission for debugging
+        if (formElement) {
+            formElement.addEventListener('submit', function(event) {
+                // Temporarily prevent default submission for debugging
+                event.preventDefault();
+                console.log("--- Checking files before submission ---");
+                console.log("Input element:", inputElement);
+                console.log("Input element files property:", inputElement.files); // Check the property we are setting
+                console.log("Number of files attached:", inputElement.files ? inputElement.files.length : 0);
+                console.log("--- End file check ---");
+
+                // AFTER seeing the console output and confirming files are attached with correct Length:
+                // 1. REMOVE event.preventDefault(); from this submit listener function
+                // 2. The form will then submit normally.
+            });
+        }
+    });
+
+    // ... (updateDropZoneThumbnail function remains the same, ensure print is console.log) ...
+    function updateDropZoneThumbnail(dropZoneElement, file) {
+       let thumbnailElement = dropZoneElement.querySelector(".drop-zone__thumb");
+       const promptElement = dropZoneElement.querySelector(".drop-zone__prompt");
+
+       // Hide prompt if a file is provided
+       if (promptElement && file) {
+           promptElement.style.display = 'none';
+       }
+
+       // If no file is provided to the thumbnail function (e.g., clearing files), remove thumbnail
+       if (!file) {
+            if (thumbnailElement) thumbnailElement.remove();
+            // Show prompt again if thumbnail removed
+            if (promptElement) promptElement.style.display = 'block';
+            return; // Stop processing if no file
+       }
+
+
+       if (!thumbnailElement) {
+           thumbnailElement = document.createElement("div");
+           thumbnailElement.classList.add("drop-zone__thumb");
+           // Append thumbnail first so querySelector finds it next time
+           dropZoneElement.appendChild(thumbnailElement);
+       }
+
+       thumbnailElement.dataset.label = file.name;
+       console.log("File type:", file.type);
+
+       if (file.type && file.type.startsWith("image/")) { // Check file.type exists and starts with image/
+           const reader = new FileReader();
+           reader.readAsDataURL(file);
+           reader.onload = () => {
+               console.log("FileReader onload finished. Setting background.");
+               // console.log(reader.result.substring(0, 50)); // Optional: log part of base64 string
+               thumbnailElement.style.backgroundImage = `url('${reader.result}')`;
+               thumbnailElement.style.backgroundColor = ''; // Clear any default background
+           };
+           reader.onerror = (error) => {
+               console.error("FileReader error:", error);
+               // Handle error visually, e.g., show broken image icon or error message
+           };
+       } else {
+           // Handle non-image files if you allow them (though your accept attribute prevents this)
+           thumbnailElement.style.backgroundImage = null;
+           thumbnailElement.style.backgroundColor = '#cccccc'; // Generic background for non-images
+           thumbnailElement.dataset.label = `Non-image file: ${file.name}`; // Update label
+       }
+    }
+
+</script> -->
+
+{% for result in results %}
+    <h3>INDEX</h3>
+    {{ result.pair_index }}
+    <h3>IMAGE1_NAME</h3>
+    {{ result.image1_name }}
+    <h3>IMAGE2_NAME</h3>
+    {{ result.image2_name }}
+    <h3>FINAL_DECISION</h3>
+    {{ result.final_decision }}
+    <h3>CONFIDENCE_SCORE</h3>
+    {{ result.confidence_score }}
+    <h3>DISTANCE_SCORES</h3>
+    {{ result.original_distances }}
+
+{% endfor %}
+
+
+
+
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const dropZone = document.getElementById('drop-zone_image2');
+    const fileInput = document.querySelector('input[name="images"]');
+    
+    // This will store all files dropped
+    const dataTransfer = new DataTransfer();
+
+    // Highlight drop zone on dragover
+    dropZone.addEventListener('dragover', function (e) {
+        e.preventDefault();
+        dropZone.classList.add('dragover');
+    });
+
+    dropZone.addEventListener('dragleave', function (e) {
+        dropZone.classList.remove('dragover');
+    });
+
+    dropZone.addEventListener('drop', function (e) {
+        e.preventDefault();
+        dropZone.classList.remove('dragover');
+
+        const files = e.dataTransfer.files;
+
+        for (let i = 0; i < files.length; i++) {
+            dataTransfer.items.add(files[i]);
+        }
+
+        fileInput.files = dataTransfer.files;
+
+        updatePrompt();
+    });
+
+    // Support click-to-select
+    dropZone.addEventListener('click', () => fileInput.click());
+
+    // Support manually selecting files from file picker
+    fileInput.addEventListener('change', function () {
+        // Clear existing and add new files to dataTransfer
+        for (let i = 0; i < fileInput.files.length; i++) {
+            dataTransfer.items.add(fileInput.files[i]);
+        }
+        fileInput.files = dataTransfer.files;
+
+        updatePrompt();
+    });
+
+    function updatePrompt() {
+        const prompt = dropZone.querySelector('.drop-zone__prompt');
+        if (dataTransfer.files.length > 0) {
+            let names = [];
+            for (let i = 0; i < dataTransfer.files.length; i++) {
+                names.push(dataTransfer.files[i].name);
+            }
+            prompt.innerHTML = 'Files added:<br>' + names.join('<br>');
+        } else {
+            prompt.textContent = "DRAG AND DROP OR CLICK TO UPLOAD IMAGE 2";
+        }
+    }
+});
+</script>
+
+
+
+
+           
+
+</body>
+</html>
+

@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login/Register</title>
+</head>
+<body>
+    {% block content %}
+    <form method="post" action="">
+        {% csrf_token %}
+        <label>USERNAME</label>
+        <input type="text" placeholder="enter your username" name="username" autofocus>
+
+        <label>PASSWORD</label>
+        <input type="password" placeholder="enter your password" name="password" autofocus>
+
+        <input type="submit" value="LOGIN">
+    </form>
+
+    <hr>
+
+<a href="{% url 'register_view' %}">
+    <button>REGISTER</button>
+</a>
+    
+    {% endblock content %}
+</body>
+</html> 
