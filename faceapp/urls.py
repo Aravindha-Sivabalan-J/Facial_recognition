@@ -13,7 +13,10 @@ urlpatterns = [
     path('addprofile/', views.create_profile, name="create_profile"),
     path('searchdbpage/', views.searchdb_view,name="searchdbpage"),
     path('compareurl/', views.compare_faces, name="comparefaces"),
-    path('videoscanning/', views.video_scanner, name = "videoscanning"),
+    path('videoscanning/', views.video_scanner, name="videoscanning"),
+    path('list-db-images/', views.list_images, name="list_db_images"),
+    path('uploader/', views.upload_view, name = "uploader"),
+    path('multiupload/', views.multiupload_view, name="multiupload"),
 ]
 
 urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)

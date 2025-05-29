@@ -1,21 +1,24 @@
 from django.shortcuts import render, redirect
+from django.http import JsonResponse
 from django.http import HttpResponse
 from django.contrib.auth.models import User
 from django.contrib.auth import login, logout, authenticate
 from django.contrib.auth.forms import UserCreationForm
 from deepface import DeepFace as df
-from .forms import ProfileForm, CompareFacesForm
+from .forms import ProfileForm, CompareFacesForm, UploadForm, MultiUploadForm
+from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.core.files.storage import FileSystemStorage
-from .models import Profile
+from .models import Profile, Comparison_Images
 from io import BytesIO
 from django.db.models import Q
 from django.conf import settings
 from PIL import Image
+import pandas as pd
 import numpy as np
 import joblib
 import os
 import cv2
-from .utils import compare_faces, cosine_similarity, compare_face
+
 
 model_load_path = os.path.join('faceapp', 'trained_model_and_scaler', 'best_logistic_regression_model.pkl')
 scaler_load_path = os.path.join('faceapp', 'trained_model_and_scaler', 'scaler.pkl')
@@ -51,7 +54,6 @@ def login_view(request):
     return render(request, 'login_reg.html')
 
 def home_view(request):
-    
     return render(request, 'home.html')
 
 def register_view(request):
@@ -108,353 +110,267 @@ def create_profile(request):
     context = {'proform': proform}
     return render(request, 'profileform.html', context)
 
+
 def searchdb_view(request):
     context = {}
-    similarities = []
+    results = []
     if request.method == 'POST':
         if 'image' in request.FILES:
-            uploaded_image= request.FILES['image']
-            image_data = uploaded_image.read()
-            image_stream = BytesIO(image_data)
-            img = Image.open(image_stream)
-            img_array = np.array(img)
-            uploaded_1 = df.represent(img_path=img_array, model_name="Facenet512")
-            uploaded_2 = df.represent(img_path=img_array, model_name="Facenet")
-            uploaded_3 = df.represent(img_path=img_array, model_name="Dlib")
-            uploaded_4 = df.represent(img_path=img_array, model_name="VGG-Face")
-            uploaded_5 = df.represent(img_path=img_array, model_name="ArcFace")
-            uploaded_embedding_1 = np.array(uploaded_1[0]['embedding']) if uploaded_1 else None
-            uploaded_embedding_2 = np.array(uploaded_2[0]['embedding']) if uploaded_2 else None
-            uploaded_embedding_3 = np.array(uploaded_3[0]['embedding']) if uploaded_3 else None
-            uploaded_embedding_4 = np.array(uploaded_4[0]['embedding']) if uploaded_4 else None
-            uploaded_embedding_5 = np.array(uploaded_5[0]['embedding']) if uploaded_5 else None
-            
-            pro_with_enc = Profile.objects.exclude(Q(Facenet512_embedding__isnull=True) | 
-                                                Q(Facenet_embedding__isnull=True) | 
-                                                Q(Dlib_embedding__isnull=True) | 
-                                                Q(VGGFace_embedding__isnull=True) | 
-                                                Q(ArcFace_embedding__isnull=True))
-            for profile in pro_with_enc:
-                stored_Facenet512 = np.frombuffer(profile.Facenet512_embedding, dtype=np.float64) if profile.Facenet512_embedding else None
-                stored_Facenet = np.frombuffer(profile.Facenet_embedding, dtype=np.float64) if profile.Facenet_embedding else None
-                stored_Dlib = np.frombuffer(profile.Dlib_embedding, dtype=np.float64) if profile.Dlib_embedding else None
-                stored_VGGFace = np.frombuffer(profile.VGGFace_embedding, dtype=np.float64) if profile.VGGFace_embedding else None
-                stored_ArcFace = np.frombuffer(profile.ArcFace_embedding, dtype=np.float64) if profile.ArcFace_embedding else None
-            
-            profile_similarities = {}
-
-            if uploaded_embedding_1 is not None and stored_Facenet512 is not None:
-                print(f"uploaded_embedding_1 shape: {uploaded_embedding_1.shape}, stored_Facenet512 shape: {stored_Facenet512.shape}")
-                profile_similarities['Facenet512'] = float(compare_faces(uploaded_embedding_1, stored_Facenet512))
-            if uploaded_embedding_2 is not None and stored_Facenet is not None:
-                print(f"uploaded_embedding_2 shape: {uploaded_embedding_2.shape}, stored_Facenet shape: {stored_Facenet.shape}")
-                profile_similarities['Facenet'] = float(compare_faces(uploaded_embedding_2, stored_Facenet))
-            if uploaded_embedding_3 is not None and stored_Dlib is not None:
-                print(f"uploaded_embedding_3 shape: {uploaded_embedding_3.shape}, stored_Dlib shape: {stored_Dlib.shape}")
-                profile_similarities['Dlib'] = float(compare_faces(uploaded_embedding_3, stored_Dlib))
-            if uploaded_embedding_4 is not None and stored_VGGFace is not None:
-                print(f"uploaded_embedding_4 shape: {uploaded_embedding_4.shape}, stored_VGGFace shape: {stored_VGGFace.shape}")
-                profile_similarities['VGG-Face'] = float(compare_faces(uploaded_embedding_4, stored_VGGFace))
-            if uploaded_embedding_5 is not None and stored_ArcFace is not None:
-                print(f"uploaded_embedding_5 shape: {uploaded_embedding_5.shape}, stored_ArcFace shape: {stored_ArcFace.shape}")
-                profile_similarities['ArcFace'] = float(compare_faces(uploaded_embedding_5, stored_ArcFace))
-            similarities.append({
-                'profile.id': profile.id,
-                'similarities': profile_similarities,
-            })
-            print(similarities)
-        
-    context['similarities'] = similarities    
+            uploaded_image = request.FILES['image']
+            fs = FileSystemStorage()
+            temp_name = fs.save(f'temp_name_{uploaded_image.name}', uploaded_image)
+            uploaded_image_path = os.path.join(settings.MEDIA_ROOT, temp_name)
+            if uploaded_image_path:
+                database_path = os.path.join(settings.MEDIA_ROOT, 'photos')
+                try:
+                    similar_images = df.find(img_path = uploaded_image_path, db_path=database_path, model_name="VGG-Face", enforce_detection=False)
+                    print(f"this is the result of similar images ${similar_images}")
+                    is_empty =  True
+                    if isinstance(similar_images, list):
+                        print("it is a list")
+                        if not similar_images:
+                            is_empty = True
+                            print("it is an emoty list")
+                            
+                        else:
+                            if isinstance(similar_images[0], pd.DataFrame):
+                                print("it is a dataframe")
+                                similar_images = similar_images[0]
+                                is_empty = similar_images.empty
+                                print("it is an empty dataframe")
+                                
+                            else:
+                                context['error'] = "DeepFace returned an unexpected list format"
+                                is_empty = True
+                    elif isinstance(similar_images, pd.DataFrame):
+                        print("it is indeed a dataframe")
+                        is_empty = similar_images.empty
+                        
+                    else:
+                        context['error'] = "DeepFace returned an unexpected type."
+                        is_empty = True
+                    
+                    if not is_empty:
+                        print("is empty is false")
+                        num_rows = len(similar_images)
+                        print(f"this is the num of rows in result: {num_rows}")
+                        top_n = min(5, num_rows)
+                        print(top_n)
+                        top_matches = similar_images.head(top_n).to_dict('records')
+                        for match in top_matches:
+                            try:
+                                print(f"these are the top matches: {top_matches}")
+                                filename = os.path.basename(match['identity'])
+                                match['database_img_url'] = os.path.join(settings.MEDIA_URL, 'photos', filename)
+                                results.append(match)
+                                print(len(results))
+                            except Exception as e:
+                                print(f"Error processing individual match: {e} for match: {match}")
+                                context['error'] = (f"Problem processing some matches: {e}")
+                                continue
+                    else:
+                        context['error'] = "No similar images found in the DataBase or DeepFace couldn't process the images"
+                except Exception as e:
+                    context['error'] = f"Error running the deepface function: {e}"
+                finally:
+                    fs.delete(temp_name)
+            else:
+                context['error'] = "image path does not exist for uploaded image"
+        else:
+            context['error'] = "Please upload an image."
+        print("Search Results (for terminal):", results)
+    context['results'] = results
     return render(request, 'searchdbform.html', context)
+        
 
 
 def compare_faces(request):
-    compareform = CompareFacesForm(request.POST, request.FILES)
     all_comparison_results = []
+    if request.method == 'GET':
+         compareform = CompareFacesForm()
+         context = {'compareform': compareform, 'results': all_comparison_results}
+         return render(request, 'compareimg.html', context)
+
     if request.method == 'POST':
-        print("step 1 passed")
-        compareform = CompareFacesForm(request.POST, request.FILES)
-        if compareform.is_valid():
-            print("form is valid")
-            uploaded_files = request.FILES.getlist('images')
+        print("POST request received")
 
-            if len(uploaded_files)%2 != 0 or len(uploaded_files)<2:
-                print("uploaded length is not 2 files")
-                context = {'compareform': compareform, 'error': 'Please upload an even number of images (at least two) to form pairs.'}
-                return render(request, 'compareimg.html', context)
+        selected_image_paths = request.POST.getlist('selected_image_paths[]')
 
-            # --- START OF THE LOOP THAT PROCESSES PAIRS ---
-            for i in range(0, len(uploaded_files), 2):
-                print(i)
-                image_1 = uploaded_files[i]
-                image_2 = uploaded_files[i+1]
-                temp_image1_filename = f'temp_upload_{request.user.id or "anon"}_{i}_1_{image_1.name}'
-                temp_image2_filename = f'temp_upload_{request.user.id or "anon"}_{i}_2_{image_2.name}'
-                image_1_path = os.path.join(settings.MEDIA_ROOT, temp_image1_filename) # Corrected from literal string
-                image_2_path = os.path.join(settings.MEDIA_ROOT, temp_image2_filename) # Corrected from literal string
+        if len(selected_image_paths) % 2 != 0 or len(selected_image_paths) < 2:
+            print("Selected image path count is not even or less than 2")
+            return JsonResponse({'error': 'Please select an even number of images (at least two) to form pairs.'}, status=400)
 
-                try:
-                    with open(image_1_path, 'wb+')as destination:
-                        for chunk in image_1.chunks():
-                            destination.write(chunk)
-                    with open(image_2_path, 'wb+')as destination:
-                        for chunk in image_2.chunks(): # <-- BUG: Was writing image_1.chunks() here again
-                            destination.write(chunk)
+        for i in range(0, len(selected_image_paths), 2):
+            print(f"Processing pair starting at index {i}")
 
-                    distance_scores = []
-                    try:
-                        # This check 'if image_1_path is not None' is redundant here
-                        # The try/except around the deepface calls is sufficient
-                        # if image_1_path is not None and image_2_path is not None:
+            image1_relative_path = selected_image_paths[i]
+            image2_relative_path = selected_image_paths[i+1]
 
-                        dummy1 = df.verify(image_1_path, image_2_path, model_name='Facenet512', enforce_detection=False)
-                        distance_scores.append(dummy1['distance'])
-                        dummy2 = df.verify(image_1_path, image_2_path, model_name='Facenet', enforce_detection=False)
-                        distance_scores.append(dummy2['distance']) # <-- BUG: Should append dummy2['distance']
-                        dummy3 = df.verify(image_1_path, image_2_path, model_name='Dlib', enforce_detection=False)
-                        distance_scores.append(dummy3['distance']) # <-- BUG: Should append dummy3['distance']
-                        dummy4 = df.verify(image_1_path, image_2_path, model_name='ArcFace', enforce_detection=False) # <-- BUG: Was VGG-Face in original comment, ArcFace in code
-                        distance_scores.append(dummy4['distance']) # <-- BUG: Should append dummy4['distance']
-                        dummy5 = df.verify(image_1_path, image_2_path, model_name='VGG-Face', enforce_detection=False) # <-- BUG: Was ArcFace in original comment, VGG-Face in code
-                        distance_scores.append(dummy5['distance']) # <-- BUG: Should append dummy5['distance']
-                        # else:
-                        #    context = {'compareform': compareform, 'error': 'either one of the file path missing'}
-                        #    return render(request, 'compareimg.html', context) # <-- This return would stop ALL processing
+            image1_path = os.path.join(settings.MEDIA_ROOT, image1_relative_path)
+            image2_path = os.path.join(settings.MEDIA_ROOT, image2_relative_path)
 
-                    # FIX: Use 'Exception'
-                    except Exception as e:
-                        print(f"DeepFace verification failed for pair {i//2 + 1}: {e}")
-                        all_comparison_results.append({
-                                 'pair_index': i//2 + 1, # Pair number (starting from 1)
-                                 # BUG: temp_image1_file and temp_image2_file do not exist. Should be image_1.name and image_2.name
-                                 'image1_name': image_1.name,
-                                 'image2_name': image_2.name,
-                                 'error': f'Verification failed: {e}'
-                             })
-                        continue # Skip the rest of this loop iteration for this pair
+            if not os.path.exists(image1_path) or not os.path.exists(image2_path):
+                 print(f"File not found on server for pair {i//2 + 1}: {image1_relative_path} or {image2_relative_path}")
+                 all_comparison_results.append({
+                     'pair_index': i//2 + 1,
+                     'image1_name': image1_relative_path,
+                     'image2_name': image2_relative_path,
+                     'error': 'Image file(s) not found on the server.'
+                 })
+                 continue
 
-                    # FIX: Corrected variable name
-                    original_distance_array = np.array(distance_scores)
+            try:
+                distance_scores = []
+                dummy1 = df.verify(image1_path, image2_path, model_name='Facenet512', enforce_detection=False)
+                distance_scores.append(dummy1['distance'])
+                dummy2 = df.verify(image1_path, image2_path, model_name='Facenet', enforce_detection=False)
+                distance_scores.append(dummy2['distance'])
+                dummy3 = df.verify(image1_path, image2_path, model_name='Dlib', enforce_detection=False)
+                distance_scores.append(dummy3['distance'])
+                dummy4 = df.verify(image1_path, image2_path, model_name='VGG-Face', enforce_detection=False)
+                distance_scores.append(dummy4['distance'])
+                dummy5 = df.verify(image1_path, image2_path, model_name='ArcFace', enforce_detection=False)
+                distance_scores.append(dummy5['distance'])
 
-                    # Check if we got exactly 5 distances
-                    if original_distance_array.shape[0] == 5:
-                        # FIX: Corrected variable names
-                        min_distance = np.min(original_distance_array)
-                        max_distance = np.max(original_distance_array)
-                        mean_distance = np.mean(original_distance_array)
-                        std_distance = np.std(original_distance_array)
+                original_distance_array = np.array(distance_scores)
 
-                        # FIX: Corrected variable name AND np.hstack needs args in a tuple
-                        input_features_for_prediction = np.hstack((original_distance_array, min_distance, max_distance, mean_distance, std_distance))
-                        # FIX: Corrected variable name
-                        input_features_for_prediction = input_features_for_prediction.reshape(1,-1)
+                if original_distance_array.shape[0] == 5:
 
-                        if loaded_scaler is not None:
-                            # FIX: Corrected variable name
-                            scaled_input_for_prediction = loaded_scaler.transform(input_features_for_prediction)
-                        else:
-                            context = {'compareform': compareform, 'error': 'scaler not available.'}
-                            # This return would stop ALL processing immediately
-                            return render(request, 'compareimg.html', context)
+                    min_distance = np.min(original_distance_array)
+                    max_distance = np.max(original_distance_array)
+                    mean_distance = np.mean(original_distance_array)
+                    std_distance = np.std(original_distance_array)
 
-                        if loaded_model is not None:
-                            # FIX: Corrected variable name
-                            probability_of_match_array = loaded_model.predict_proba(scaled_input_for_prediction)
-                            probability_of_match_number = probability_of_match_array[0,1]
-                        else:
-                            context = {'compareform': compareform, 'error': 'Model not available.'}
-                            # This return would stop ALL processing immediately
-                            return render(request, 'compareimg.html', context)
+                    input_features_for_prediction = np.hstack((original_distance_array, min_distance, max_distance, mean_distance, std_distance))
+                    input_features_for_prediction = input_features_for_prediction.reshape(1,-1)
 
-                        chosen_threshold = 0.499
-                        final_decision = "Not a match"
-                        if probability_of_match_number >= chosen_threshold:
-                            final_decision = "Match"
-                            print(final_decision) # For debugging
-
-                        # Append results for this pair
-                        all_comparison_results.append({
-                            "pair_index": i//2+1, # Use consistent key name
-                            # BUG: Use image_1.name and image_2.name for original filenames
-                            "image1_name": temp_image1_filename,
-                            "image2_name": temp_image2_filename, # FIX: Corrected duplicate key name
-                            "final_decision": final_decision,
-                            'confidence_score': f"{probability_of_match_number:.4f}",
-                            'original_distances': original_distance_array.tolist()
-                        })
-                        print(all_comparison_results) # For debugging
-
-                    # --- BUG: This else block is misplaced ---
-                    # It's currently the 'else' for the threshold check (if probability >= threshold)
-                    # It should be the 'else' for 'if original_distance_array.shape[0] == 5:'
+                    if loaded_scaler is not None:
+                        scaled_input_for_prediction = loaded_scaler.transform(input_features_for_prediction)
                     else:
-                        print(f"Could not get 5 distance scores for pair {i//2 + 1}.")
-                        all_comparison_results.append({
-                            'pair_index': i//2 + 1,
-                             # BUG: Use image_1.name and image_2.name
-                            'image1_name': temp_image1_file.name,
-                            'image2_name': temp_image2_file.name,
-                            'error': 'Could not get 5 distance scores.'
-                         })
+                        return JsonResponse({'error': 'Model scaler not available.'}, status=500)
 
-                # FIX: Use 'Exception'
-                except Exception as e:
-                    print(f"an error occured while processing pair {i//2+1}: {e}")
+                    if loaded_model is not None:
+                        probability_of_match_array = loaded_model.predict_proba(scaled_input_for_prediction)
+                        probability_of_match_number = probability_of_match_array[0,1]
+                    else:
+                        return JsonResponse({'error': 'Prediction model not available.'}, status=500)
+
+                    chosen_threshold = 0.499
+                    final_decision = "Not a match"
+                    if probability_of_match_number >= chosen_threshold:
+                        final_decision = "Match"
+                    print(final_decision)
+
                     all_comparison_results.append({
-                         'pair_index': i//2 + 1, # Pair number (starting from 1)
-                          # BUG: Use image_1.name and image_2.name
-                         'image1_name': temp_image1_file.name,
-                         'image2_name': temp_image2_file.name,
-                         'error': f"an error occured: {e}"
-                     })
+                        "pair_index": i//2+1,
+                        "image1_name": image1_relative_path,
+                        "image2_name": image2_relative_path,
+                        "final_decision": final_decision,
+                        'confidence_score': f"{probability_of_match_number:.4f}",
+                        'original_distances': original_distance_array.tolist()
+                    })
+                    print(f"Finished pair {i//2 + 1}")
 
-                finally:
-                    # Clean up temporary files for the CURRENT pair
-                    # BUG: 'image1_path' and 'image2_path' variables are correct in the 'os.remove' calls
-                    # but they were previously constructed using literal strings (now fixed above).
-                    # The os.path.exists checks here are using the correct variable names.
-                    os.remove(image_1_path) if os.path.exists(image_1_path) else None # FIX: variable name mismatch in os.path.exists
-                    os.remove(image_2_path) if os.path.exists(image_2_path) else None # FIX: variable name mismatch in os.path.exists
-
-                # --- MAJOR BUG HERE ---
-                # This return statement is INSIDE the for loop.
-                # It executes after the first pair is processed (or errors out in a specific way).
-                # This causes the view to stop and render the template showing results/errors for only the first pair.
-            context = {'compareform': compareform, 'results': all_comparison_results}
-            return render(request, 'compareimg.html', context)
-        # If form is NOT valid
-        else:
-            print("form is not valid for submission")
-            print(compareform.errors)
-            context = {'compareform': compareform}
-            return render(request, 'compareimg.html', context)
-
-    # --- If request method is GET ---
+                else:
+                    print(f"Could not get 5 distance scores for pair {i//2 + 1} ({image1_relative_path}, {image2_relative_path}).")
+                    all_comparison_results.append({
+                       'pair_index': i//2 + 1,
+                       'image1_name': image1_relative_path,
+                       'image2_name': image2_relative_path,
+                       'error': 'Could not get 5 distance scores.'
+                    })
+            except Exception as e:
+                print(f"An unexpected error occurred processing pair {i//2+1} ({image1_relative_path}, {image2_relative_path}): {e}")
+                all_comparison_results.append({
+                    'pair_index': i//2 + 1,
+                    'image1_name': image1_relative_path,
+                    'image2_name': image2_relative_path,
+                    'error': f"An unexpected error occurred: {e}"
+                })
+        return JsonResponse({'results': all_comparison_results})
     else:
-        context = {'compareform': compareform}
+        compareform = CompareFacesForm()
+        context = {'compareform': compareform, 'results': all_comparison_results}
         return render(request, 'compareimg.html', context)
 
-# --- END OF FUNCTION ---
+
+# def list_images(request):
+#     images_from_db = Comparison_Images.objects.all()
+#     image_data=[]
+#     for image_obj in images_from_db:
+#         image_data.append({
+#             'id': image_obj.id,
+#             'name': image_obj.images.name,
+#             'image': image_obj.images.url,
+#         })
+#     return JsonResponse({'images': image_data})
 
 
-# def compare_faces(request):
-#     all_comparison_results = []
-#     compareform = CompareFacesForm(request.POST, request.FILES)
-#     if request.method == 'POST':
-#         if compareform.is_valid():
-#             uploaded_files = request.FILES.getlist('images')
-#             if len(uploaded_files)%2 != 0 or len(uploaded_files)<2:
-#                 context = {'compareform': compareform, 'error': 'Please upload an even number of images (at least two) to form pairs.'}
-#                 return render(request, 'compareimg.html', context)
-#             for i in range(0, len(uploaded_files), 2):
-#                 image_1 = uploaded_files[i]
-#                 image_2 = uploaded_files[i+1]
-#                 temp_image1_filename = f'temp_upload_{request.user.id or "anon"}_{i}_1_{image_1.name}'
-#                 temp_image2_filename = f'temp_upload_{request.user.id or "anon"}_{i}_2_{image_2.name}'
-#                 image_1_path = os.path.join(settings.MEDIA_ROOT, temp_image1_filename)
-#                 image_2_path = os.path.join(settings.MEDIA_ROOT, temp_image2_filename)
-#                 try:
-#                     with open(image_1_path, 'wb+')as destination:
-#                         for chunk in image_1.chunks():
-#                             destination.write(chunk)
-#                     with open(image_2_path, 'wb+')as destination:
-#                         for chunk in image_2.chunks():
-#                             destination.write(chunk)
-#                     distance_scores = []
-#                     try:
-#                         if image_1_path is not None and image_2_path is not None:
-#                             dummy1 = df.verify(image_1_path, image_2_path, model_name='Facenet512', enforce_detection=False)
-#                             distance_scores.append(dummy1['distance'])
-#                             dummy2 = df.verify(image_1_path, image_2_path, model_name='Facenet', enforce_detection=False)
-#                             distance_scores.append(dummy1['distance'])
-#                             dummy3 = df.verify(image_1_path, image_2_path, model_name='Dlib', enforce_detection=False)
-#                             distance_scores.append(dummy1['distance'])
-#                             dummy4 = df.verify(image_1_path, image_2_path, model_name='ArcFace', enforce_detection=False)
-#                             distance_scores.append(dummy1['distance'])
-#                             dummy5 = df.verify(image_1_path, image_2_path, model_name='VGG-Face', enforce_detection=False)
-#                             distance_scores.append(dummy1['distance'])
-#                     except Exception as e:
-#                         print(f"DeepFace verification failed for pair {i//2 + 1}: {e}")
-#                         all_comparison_results.append({
-#                                 'pair_index': i//2 + 1, # Pair number (starting from 1)
-#                                 'image1_name': temp_image1_file.name,
-#                                 'image2_name': temp_image2_file.name,
-#                                 'error': f'Verification failed: {e}'
-#                             })
-#                         continue
+def list_images(request):
+    images_from_db = Comparison_Images.objects.all().order_by('id')
 
-#                     original_distance_array = np.array(distance_scores)
+    page_size = int(request.GET.get('limit', 100))
+    page_number = request.GET.get('page', 1)
 
-#                     if original_distance_array.shape[0] == 5:
-#                         min_distance = np.min(original_distance_array)
-#                         max_distance = np.max(original_distance_array)
-#                         mean_distance = np.mean(original_distance_array)
-#                         std_distance = np.std(original_distance_array)
+    paginator = Paginator(images_from_db, page_size)
 
-#                         input_features_for_prediction = np.hstack((original_distance_array, min_distance, max_distance, mean_distance, std_distance))
-#                         input_features_for_prediction = input_features_for_prediction.reshape(1,-1)   
+    try:
+        current_page_images = paginator.page(page_number)
+    except PageNotAnInteger:
+        current_page_images = paginator.page(1)
+    except EmptyPage:
+        current_page_images = paginator.page(paginator.num_pages)
 
-#                         if loaded_scaler is not None:
-#                             scaled_input_for_prediction = loaded_scaler.transform(input_features_for_prediction)
-#                         else:
-#                             context = {'compareform': compareform, 'error': 'scaler not available.'}
-#                             return render(request, 'compareimg.html', context)
+    image_data = []
+    for image_obj in current_page_images:
+        image_data.append({
+            'id': image_obj.id,
+            'name': image_obj.images.name, 
+            'image': image_obj.images.url,
+        })
 
-#                         if loaded_model is not None:
-#                             probability_of_match_array = loaded_model.predict_proba(scaled_input_for_prediction)
-#                             probability_of_match_number = probability_of_match_array[0,1]
-#                         else:
-#                             context = {'compareform': compareform, 'error': 'Model not available.'}
-#                             return render(request, 'compareimg.html', context)
+    return JsonResponse({
+        'images': image_data,
+        'total_images': paginator.count,       
+        'total_pages': paginator.num_pages,     
+        'current_page': current_page_images.number,
+        'page_size': page_size
+    })
 
 
-#                         chosen_threshold = 0.48
-#                         final_decision = "Not a match"
-#                         if probability_of_match_number >= chosen_threshold:
-#                             final_decision = "Match"
-#                             print(final_decision)
-#                         all_comparison_results.append({
-#                             "image_index": i//2+1,
-#                             "image_1_name": temp_image1_filename,
-#                             "image_2_name": temp_image2_filename,
-#                             "final_decision": final_decision,
-#                             'confidence_score': f"{probability_of_match_number:.4f}",
-#                             'original_distances': original_distance_array.tolist()
-#                         })
-#                         print(all_comparison_results)
-#                     else:
-#                         print(f"Could not get 5 distance scores for pair {i//2 + 1}.")
-#                         all_comparison_results.append({
-#                             'pair_index': i//2 + 1,
-#                             'image1_name': temp_image1_file.name,
-#                             'image2_name': temp_image2_file.name,
-#                             'error': 'Could not get 5 distance scores.'
-#                          })
-#                 except Exception as e:
-#                     print(f"an error occured while processing pair {i//2+1}: {e}")
-#                     all_comparison_results.append({
-#                         'pair_index': i//2 + 1, # Pair number (starting from 1)
-#                         'image1_name': temp_image1_file.name,
-#                         'image2_name': temp_image2_file.name,
-#                         'error': f"an error occured: {e}"
-#                     })
-#                 finally:
-#                     os.remove(image1_path) if os.path.exists(image_1_path) else None
-#                     os.remove(image2_path) if os.path.exists(image_2_path) else None
-#             context = {'compareform': compareform, 'results': all_comparison_results}
-#             return render(request, 'compareimg.html', context)
-#         else:
-#             context = {'compareform': compareform}
-#             return render(request, 'compareimg.html', context)
-#     else:
-#         context = {'compareform': compareform}
-#         return render(request, 'compareimg.html', context)
+def upload_view(request):
+    upload = UploadForm()
+    if request.method == 'POST':
+        upload = UploadForm(request.POST, request.FILES)
+        if upload.is_valid():
+            comparison_image = upload.save(commit=False)
+            comparison_image.save()
+            context = {'upload':upload}
+            return render(request, 'uploadform.html', context)
+    context = {'upload':upload}
+    return render(request, 'uploadform.html', context)
 
+def multiupload_view(request):
+    multiupload = MultiUploadForm()
+    if request.method == 'POST':
+        multiupload = MultiUploadForm(request.POST, request.FILES)
+        if multiupload.is_valid():
+            uploaded_images = request.FILES.getlist('images_to_be_uploaded')
+            for image in uploaded_images:
+                comparison_image = Comparison_Images()
+                comparison_image.images = image
+                comparison_image.save()
+    multiupload = MultiUploadForm()
+    context = {'multiupload':multiupload}
+    return render(request, 'uploadform.html', context)
     
 
 def video_scanner(request):
     matches = []
     snapshots = []
+    
+    unique_persons = set() 
+
     if request.method == 'POST':
         if 'video' in request.FILES:
             video = request.FILES['video']
@@ -464,48 +380,103 @@ def video_scanner(request):
 
             cap = cv2.VideoCapture(video_path)
             fps = cap.get(cv2.CAP_PROP_FPS)
+            total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
             interval = int(fps * 1)
+            BLACK_FRAME_THRESHOLD = 15
 
-            frame_num = 0
+            print(f"Video FPS: {fps}")
+            print(f"Total Frames: {total_frames}")
+            print(f"Snapshot Interval (frames): {interval}")
+            print(f"Expected number of snapshots: {total_frames / interval}")
+
+            frame_num = 0 
             snapshot_index = 0
             while cap.isOpened():
                 ret, frame = cap.read()
+                current_frame_index = frame_num 
+                frame_num += 1 
+                print(f"Processing Frame {current_frame_index}: ret={ret}") 
                 if not ret:
-                    break
-                if frame_num % interval == 0:
+                    print(f"Breaking loop at frame {current_frame_index} because ret is False.")
+                    break                
+                gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+                mean_intensity = np.mean(gray_frame)
+                if mean_intensity < BLACK_FRAME_THRESHOLD:
+                    print(f"Skipping processing for frame {current_frame_index} due to low intensity ({mean_intensity:.2f}) - too dark/black.") 
+                    continue
+                if current_frame_index % interval == 0:
                     snapshot_path = os.path.join(settings.MEDIA_ROOT, f'snapshot_{snapshot_index}.jpg')
                     cv2.imwrite(snapshot_path, frame)
-
                     try:
-                        results = df.find(img_path=snapshot_path, db_path=os.path.join(settings.MEDIA_ROOT, 'photos'), enforce_detection=False)
+                        results = df.find(
+                            img_path=snapshot_path, 
+                            db_path=os.path.join(settings.MEDIA_ROOT, 'photos'), 
+                            # model_name="ArcFace",          
+                            # distance_metric="euclidean_l2", 
+                            # detector_backend="retinaface",
+                            enforce_detection=False
+                        )
                         print("Results for snapshot:", snapshot_path)
-                        print("Returned results:", results)
-
+                        print("Returned results:", results) 
 
                         if results and not results[0].empty:
-                            snapshot_rel_path = f'media/snapshot_{snapshot_index}.jpg'
-                            snapshots.append(snapshot_rel_path)
+                            confirm_matches_for_current_snapshot = [] 
+                            similar_matches_for_current_snapshot = []
+                            STRICT_THRESHOLD = 0.45
+                            LOOSE_THRESHOLD = 0.61
+                            
+                            has_new_person_for_display = False
 
-                            match_info = []
                             for i, row in results[0].iterrows():
-                                full_path = row['identity']
-                                # Convert full path to relative path (e.g., media/photos/image1.jpg)
-                                rel_path = os.path.relpath(full_path, settings.BASE_DIR).replace("\\", "/")
-                                match_info.append({
-                                    'image': rel_path,
-                                    'distance': row['distance']
-                                })
+                                person_identity_path = row['identity']
+                                current_distance = row['distance']
+                                print(f"  Match candidate: {person_identity_path}, Distance: {current_distance:.4f}") 
+                                if current_distance <= STRICT_THRESHOLD:
+                                    rel_path = os.path.relpath(person_identity_path, settings.BASE_DIR).replace("\\", "/")
+                                    confirm_matches_for_current_snapshot.append({
+                                        'image': rel_path,
+                                        'distance': current_distance,
+                                        'status': 'confirmed match'
+                                    })
+                                    if person_identity_path not in unique_persons:
+                                        has_new_person_for_display = True
+                                        
+                                elif current_distance <= LOOSE_THRESHOLD:
+                                    rel_path = os.path.relpath(person_identity_path, settings.BASE_DIR).replace("\\","/")
+                                    similar_matches_for_current_snapshot.append({
+                                        'image': rel_path,
+                                        'distance': current_distance,
+                                        'status': 'similar profile'
+                                    })
+                                    if person_identity_path not in unique_persons:
+                                        has_new_person_for_display = True
+                                else:
+                                    print(f"  Skipping match for {person_identity_path} due to high distance: {current_distance:.4f} (above {LOOSE_THRESHOLD})") 
+                            if has_new_person_for_display:
+                                for match_item in confirm_matches_for_current_snapshot:
+                                    unique_persons.add(os.path.join(settings.BASE_DIR, match_item['image']).replace("/", os.sep))
+                                for match_item in similar_matches_for_current_snapshot:
+                                    unique_persons.add(os.path.join(settings.BASE_DIR, match_item['image']).replace("/", os.sep))
 
-                            matches.append(match_info)
-                        # if results and not results[0].empty:
-                        #     print("Number of Matches Found:", len(results[0]))
-                        #     matches.append(results[0].to_dict('records'))
-                        #     snapshots.append(f'media/snapshot_{snapshot_index}.jpg')
+                                snapshot_rel_path = f'media/snapshot_{snapshot_index}.jpg'
+                                snapshots.append(snapshot_rel_path)
+                                if confirm_matches_for_current_snapshot:
+                                    matches.append(confirm_matches_for_current_snapshot)
+                                    print(f"Snapshot {snapshot_index}: {len(confirm_matches_for_current_snapshot)} confirmed match(es) added (some might be new for display).")
+                                elif similar_matches_for_current_snapshot:
+                                    matches.append(similar_matches_for_current_snapshot)
+                                    print(f"Snapshot {snapshot_index}: No confirmed, but {len(similar_matches_for_current_snapshot)} similar match(es) added (some might be new for display).")
+                                else:
+                                    print(f"Snapshot {snapshot_index}: New person(s) detected, but no matches met thresholds for display.")
+                            else:
+                                print(f"Snapshot {snapshot_index}: No new unique persons found for display. Skipping adding to final lists.")
+                        else:
+                            print(f"No faces detected or no matches returned by DeepFace for snapshot: {snapshot_index}")
+
                     except Exception as e:
-                        print("DeepFace error:", e)
+                        print(f"DeepFace error for snapshot {snapshot_index}: {e}")
 
-                    snapshot_index += 1
-                frame_num += 1
+                    snapshot_index += 1 
 
             cap.release()
             os.remove(video_path)

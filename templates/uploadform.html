@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UPLOAD FORM</title>
+</head>
+<body>
+    <!-- <form method="POST" enctype="multipart/form-data">
+    {% csrf_token %}
+    {{ upload.as_p }}
+    <button type="submit">Upload</button>
+    </form> -->
+
+    <form method="POST"  action="{% url 'multiupload' %}" enctype="multipart/form-data">
+        {% csrf_token %}
+        <input type="file" id="images" name="images_to_be_uploaded" multiple accept="image/*">
+        <button type="submit">Upload</button>
+    </form>
+</body>
+</html>

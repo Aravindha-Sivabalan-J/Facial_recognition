@@ -13,3 +13,11 @@ class Profile(models.Model):
     ArcFace_embedding = models.BinaryField(blank=True, null=True)
     created = models.DateTimeField(auto_now_add=True)
     updated = models.DateTimeField(auto_now=True)
+
+
+class Comparison_Images(models.Model):
+    images = models.ImageField(blank=False, null=False, upload_to='photos')
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+    
+    def get_absolute_url(self):
+        return self.image_file.url

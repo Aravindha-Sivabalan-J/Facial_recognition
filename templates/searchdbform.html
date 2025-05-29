@@ -15,9 +15,21 @@
         </form>
     </div>
 
-    <div>
-        
+    {% if results %}
+    <h2>Top Matches:</h2>
+    <div style="display: flex; flex-wrap: wrap; gap: 20px;">
+        {% for match in results %}
+        <div style="border: 3px solid #470505; padding: 10px; border-radius: 10px; width: fit-content;">
+            <img src="{{ match.database_img_url }}" alt="Matched Face" style="width: 100%; height: auto; border-radius: 5px;" />
+            <p><strong>Identity:</strong><br>{{ match.identity }}</p>
+            <p><strong>Distance:</strong> {{ match.distance|floatformat:3 }}</p>
+        </div>
+        {% endfor %}
     </div>
+    {% elif error %}
+    <p style="color: red;">{{ error }}</p>
+    {% endif %}
+
 <br><br>
     <a href="{% url 'home_view' %}">
         <button>HOME</button>

@@ -5,547 +5,433 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Document</title>
     
+    
+
     <style>
-        /* In your <style> tag or separate CSS file */
-        .drop-zone {
-            max-width: 200px; /* Adjust size as needed */
-            height: 150px;    /* Adjust size as needed */
-            padding: 25px;
-            display: flex; /* Use flexbox for centering content */
-            align-items: center; /* Center vertically */
-            justify-content: center; /* Center horizontally */
-            text-align: center;
-            font-family: "Quicksand", sans-serif; /* Example font */
-            font-weight: 500;
-            font-size: 15px;
-            cursor: pointer; /* Show pointer cursor on hover */
-            color: #cccccc; /* Light gray text */
-            border: 2px dashed #cccccc; /* Dashed border */
-            border-radius: 10px; /* Rounded corners */
-            margin-bottom: 20px; /* Space between the two drop zones */
-        }
+    #selected-images-display {
+    margin-top: 20px;
+    padding: 10px;
+    border: 5px dashed #ccc;
+    min-height: 50px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    }
 
-        .drop-zone--over {
-            border-style: solid; /* Change border style when dragging over */
-            box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.3); /* Add a subtle shadow */
-            color: #000000; /* Change text color */
-        }
+    
+    #selected-images-display .img-box {
+        width: 120px; 
+        height: 120px; 
+        border: 5px solid blue;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        overflow: hidden;
+        flex-shrink: 0;
+    }
 
-        .drop-zone__input {
-            display: none; /* Hide the default file input button */
-        }
+    #selected-images-display .img-box img {
+        width: 100%; /* Make image fill the parent img-box */
+        height: 100%; /* Make image fill the parent img-box */
+        object-fit: cover; /* Ensures images fill the box without distortion */
+        display: block; /* Remove any default inline-block spacing issues */
+    }
+    .modal-image-grid {
+        display: grid;
+        grid-template-columns: repeat(10, 1fr); /* 10 columns, equal width */
+        gap: 5px; /* Adjust gap as needed */
+        max-height: 40vh; /* Or a fixed height, make it scrollable if many images */
+        overflow-y: auto; /* Enable vertical scrolling */
+        padding: 10px;
+        border: 1px solid #ddd;
+        background-color: #f9f9f9;
+    }
 
-        .drop-zone__thumb {
-            width: 100%;
-            height: 100%;
-            border-radius: 10px;
-            overflow: hidden; /* Hide parts of the image outside the border-radius */
-            background-color: #cccccc; /* Placeholder background */
-            background-size: cover; /* Cover the area */
-            position: relative; /* Needed for positioning content inside */
-        }
+    .modal-image-grid .img-box {
+        border: 2px solid transparent;
+        cursor: pointer;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        aspect-ratio: 1 / 1; /* Make boxes square */
+        overflow: hidden;
+    }
 
-        .drop-zone__thumb::after {
-            content: attr(data-label); /* Show filename as text */
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            width: 100%;
-            padding: 5px 0;
-            color: #ffffff; /* White text */
-            background: rgba(0, 0, 0, 0.7); /* Semi-transparent black background */
-            font-size: 12px;
-            text-align: center;
-        }
-    </style>
+    .modal-image-grid .img-box img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover; /* Ensures images fill the box without distortion */
+        display: block; /* Remove extra space below image */
+    }
+
+    .modal-image-grid .img-box.selected {
+        border: 5px solid;
+        border-color: blue; /* Highlight selected images */
+    }
+
+    /* Styles for pagination controls */
+    .pagination-controls {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        margin-top: 15px;
+        gap: 15px;
+    }
+
+    .pagination-controls button {
+        padding: 8px 15px;
+        background-color: #007bff;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+    }
+    .pagination-controls button:disabled {
+        background-color: #cccccc;
+        cursor: not-allowed;
+    }
+</style>
+  
 </head>
 <body>
-    <!-- <form method="POST" action="{% url 'comparefaces' %}" enctype="multipart/form-data">
-        {% csrf_token %}
-        {{ compareform.as_p }}
-        <input type="submit" value="REGISTER">
-    </form> -->
-    <!-- <div class="drop-zone" id="drop-zone-image1" style="padding: 20px; border: 1px solid red; margin: 15px;">
-            <span class="drop-zone__prompt">DRAG AND DROP OR CLICK TO UPLOAD IMAGE 1</span>
-            <input type="file" id="image1" name="image1" accept="image/*" class="drop-zone__input">
-        </div> -->
 
 
-    <form method="POST" action="{% url 'comparefaces' %}" enctype="multipart/form-data">
-        {% csrf_token %}
-        <div class="drop-zone" id="drop-zone_image2" style="padding: 20px; border: 1px solid red; margin: 15px;">
-            <span class="drop-zone__prompt">DRAG AND DROP OR CLICK TO UPLOAD IMAGE 2</span>
-            <input type="file" id="images" name="images" class="drop-zone__input" multiple accept="image/*">
-        </div>
-        <button type="submit">Compare Faces</button>
-    </form>
+
+<button id="open-gallery-button" type="button">Open Gallery</button>
+<form id="image-form" method="POST">
     
-                <!-- //     document.querySelectorAll(".drop-zone__input").forEach(inputElement => {
-        //         const dropZoneElement = inputElement.closest(".drop-zone");
-        //         const formElement = inputElement.form;
-        //         dropZoneElement.addEventListener("click", () => {
-        //             inputElement.click();
-        //         });
-        //         inputElement.addEventListener("change", function(){
-        //             console.log("Files selected via click:", this.files);
-        //             if (this.files.length > 0) {
-        //                 inputElement.files = this.files;
-        //                 updateDropZoneThumbnail(dropZoneElement, this.files[0])
-        //             }
-        //         });
-        //         dropZoneElement.addEventListener("dragover", e => {
-        //             e.preventDefault();
-        //             dropZoneElement.classList.add("drop-zone--over");
-        //         });
-        //         ["dragleave", "dragend"].forEach(type => {
-                    
-        //             dropZoneElement.addEventListener(type, e => {
-        //                 dropZoneElement.classList.remove("drop-zone--over");
-        //             })
-        //         });
-        //         dropZoneElement.addEventListener("drop", e => {
-        //             e.preventDefault();
-        //             console.log("Files dropped:", e.dataTransfer.files);
-        //             if (e.dataTransfer.files.length > 0) {
-        //                 inputElement.files = e.dataTransfer.files;
-        //                 updateDropZoneThumbnail(dropZoneElement, e.dataTransfer.files[0]);
-        //             }
-        //             dropZoneElement.classList.remove("drop-zone--over");
-        //         });
-        //         if (formElement) { // Ensure the input is inside a form
-        //         formElement.addEventListener('submit', function(event) {
-        //             // Temporarily prevent default submission to check files property
-        //             event.preventDefault();
-        //             console.log("--- Checking files before submission ---");
-        //             console.log("Input element:", inputElement);
-        //             console.log("Input element files property:", inputElement.files);
-        //             console.log("Number of files attached:", inputElement.files ? inputElement.files.length : 0);
-        //             console.log("--- End file check ---");
-
-        //             // *** To actually submit after checking, REMOVE event.preventDefault(); ***
-        //             // This line must be removed or commented out to allow actual submission
-        //             // After removing preventDefault, you can check the Network tab again (may still need curl)
-        //         });
-        //     }
-        // });
-            
-        // function updateDropZoneThumbnail(dropZoneElement, file) {
-        //     let thumbnailElement = dropZoneElement.querySelector(".drop-zone__thumb");
-        //     const promptElement = dropZoneElement.querySelector(".drop-zone__prompt");
-        //     if (promptElement) {
-        //         promptElement.style.display = 'none';
-        //     }
-        //     if (!thumbnailElement) {
-        //         thumbnailElement = document.createElement("div");
-        //         thumbnailElement.classList.add("drop-zone__thumb");
-        //         dropZoneElement.appendChild(thumbnailElement);
-        //     }
-        //     thumbnailElement.dataset.label = file.name
-        //     console.log("File type:", file.type);
-        //     if (file.type.startsWith("/image")){
-        //         const reader = new FileReader()
-        //         reader.readAsDataURL(file)
-        //         reader.onload = () =>{
-        //             console.log("FileReader onload finished. Setting background.");
-        //             print("FileReader onload finished. Setting background.")
-        //             print (reader.result.substring(0, 50))
-        //             thumbnailElement.style.backgroundImage = `url('${reader.result}')`
-        //             thumbnailElement.style.backgroundColor = '';
-        //         }
-        //     } else {
-        //         thumbnailElement.style.backgroundImage = null;
-        //         thumbnailElement.style.backgroundColor = '#cccccc';
-        //     }
-        // } -->
-
-<!-- <script>
-    // Use a DataTransfer object to manage the list of files selected/dropped
-    // This allows accumulating files from multiple interactions
-    const dataTransfer = new DataTransfer(); // Requires modern browser support
-
-    document.querySelectorAll(".drop-zone__input").forEach(inputElement => {
-        const dropZoneElement = inputElement.closest(".drop-zone");
-        const formElement = inputElement.form; // Get the parent form element
-
-        // Ensure the input starts with an empty file list managed by our DataTransfer object
-        inputElement.files = dataTransfer.files;
-
-        dropZoneElement.addEventListener("click", () => {
-            inputElement.click();
-        });
-
-        inputElement.addEventListener("change", function(){
-            console.log("Files selected via click:", this.files); // Log selected files
-            if (this.files.length > 0) {
-                // Add selected files to our DataTransfer object
-                for (let i = 0; i < this.files.length; i++) {
-                    dataTransfer.items.add(this.files[i]);
-                }
-                // Assign the accumulated files from DataTransfer back to the input
-                inputElement.files = dataTransfer.files;
-                console.log("Input files after change:", inputElement.files);
-                updateDropZoneThumbnail(dropZoneElement, this.files[0]); // Still just previewing the first file
-            } else {
-                 // If selection is cancelled, clear the files entirely
-                 dataTransfer = new DataTransfer(); // Reset DataTransfer object
-                 inputElement.files = dataTransfer.files; // Assign empty FileList
-                 console.log("Input files after change (cancelled):", inputElement.files);
-                 // You might want to clear the visual thumbnail here too
-                 const thumbnailElement = dropZoneElement.querySelector(".drop-zone__thumb");
-                 if (thumbnailElement) thumbnailElement.remove();
-                 const promptElement = dropZoneElement.querySelector(".drop-zone__prompt");
-                 if (promptElement) promptElement.style.display = 'block'; // Show prompt again
-            }
-        });
-
-        dropZoneElement.addEventListener("dragover", e => {
-            e.preventDefault();
-            dropZoneElement.classList.add("drop-zone--over");
-        });
-
-        ["dragleave", "dragend"].forEach(type => {
-            dropZoneElement.addEventListener(type, e => {
-                dropZoneElement.classList.remove("drop-zone--over");
-            });
-        });
-
-        dropZoneElement.addEventListener("drop", e => {
-            e.preventDefault();
-            console.log("Files dropped:", e.dataTransfer.files); // Log dropped files
-            if (e.dataTransfer.files.length > 0) {
-                // Add dropped files to our DataTransfer object
-                 for (let i = 0; i < e.dataTransfer.files.length; i++) {
-                    dataTransfer.items.add(e.dataTransfer.files[i]);
-                }
-                // Assign the accumulated files from DataTransfer back to the input
-                inputElement.files = dataTransfer.files;
-                console.log("Input files after drop:", inputElement.files);
-                updateDropZoneThumbnail(dropZoneElement, e.dataTransfer.files[0]); // Still just previewing the first file
-            } else {
-                 // If drop is empty, clear the files entirely
-                 dataTransfer = new DataTransfer(); // Reset DataTransfer object
-                 inputElement.files = dataTransfer.files; // Assign empty FileList
-                 console.log("Input files after drop (empty):", inputElement.files);
-                 // You might want to clear the visual thumbnail here too
-                 const thumbnailElement = dropZoneElement.querySelector(".drop-zone__thumb");
-                 if (thumbnailElement) thumbnailElement.remove();
-                 const promptElement = dropZoneElement.querySelector(".drop-zone__prompt");
-                 if (promptElement) promptElement.style.display = 'block'; // Show prompt again
-            }
-            dropZoneElement.classList.remove("drop-zone--over");
-        });
-
-        // Keep the check before submission for debugging
-        if (formElement) {
-            formElement.addEventListener('submit', function(event) {
-                // Temporarily prevent default submission for debugging
-                event.preventDefault();
-                console.log("--- Checking files before submission ---");
-                console.log("Input element:", inputElement);
-                console.log("Input element files property:", inputElement.files); // Check the property we are setting
-                console.log("Number of files attached:", inputElement.files ? inputElement.files.length : 0);
-                console.log("--- End file check ---");
-
-                // AFTER seeing the console output and confirming files are attached:
-                // 1. REMOVE event.preventDefault(); from here
-                // 2. Submit the form normally or programmatically (e.g., event.target.submit())
-            });
-        }
-    });
-
-    // ... (your updateDropZoneThumbnail function remains the same, remember to fix print to console.log) ...
-    function updateDropZoneThumbnail(dropZoneElement, file) {
-       let thumbnailElement = dropZoneElement.querySelector(".drop-zone__thumb");
-       const promptElement = dropZoneElement.querySelector(".drop-zone__prompt");
-
-       // Hide prompt regardless of file existence for consistency when files might be selected
-       if (promptElement) {
-           promptElement.style.display = 'none';
-       }
-
-       // If no file is provided to the thumbnail function (e.g., clearing files), remove thumbnail
-       if (!file) {
-            if (thumbnailElement) thumbnailElement.remove();
-            // You might want to show the prompt again here if you clear files
-            if (promptElement) promptElement.style.display = 'block';
-            return; // Stop processing if no file
-       }
+    <div id="selected-images-display" class="gallery">
+    </div>
+    <br>
+    {% csrf_token %}
+    <button type="submit">Compare Selected Images</button>
+</form>
 
 
-       if (!thumbnailElement) {
-           thumbnailElement = document.createElement("div");
-           thumbnailElement.classList.add("drop-zone__thumb");
-           // Append thumbnail first so querySelector finds it next time
-           dropZoneElement.appendChild(thumbnailElement);
-       }
+<div id="comparison-results-container">
+    {# Results will be dynamically added here by JavaScript #}
+</div>
 
-       thumbnailElement.dataset.label = file.name;
-       console.log("File type:", file.type);
+<div id="image-gallery-modal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2>Select Images from Gallery</h2>
+            <span class="close">&times;</span> {# Close button #}
+        </div>
+        <div class="modal-body">
+            <div id="modal-image-container" class="modal-image-grid">
+                {# Images will be loaded here #}
+            </div>
+            <div class="pagination-controls">
+                <button id="prev-page-button" type="button" disabled>&lt; Previous</button>
+                <span id="page-info">Page 1 of 1</span>
+                <button id="next-page-button" type="button" disabled>Next &gt;</button>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button id="confirm-selection-button" type="button">Confirm Selection</button>
+        </div>
+    </div>
+</div>
 
-       if (file.type && file.type.startsWith("image/")) { // Check file.type exists and starts with image/
-           const reader = new FileReader();
-           reader.readAsDataURL(file);
-           reader.onload = () => {
-               console.log("FileReader onload finished. Setting background.");
-               // console.log(reader.result.substring(0, 50)); // Optional: log part of base64 string
-               thumbnailElement.style.backgroundImage = `url('${reader.result}')`;
-               thumbnailElement.style.backgroundColor = ''; // Clear any default background
-           };
-           reader.onerror = (error) => {
-               console.error("FileReader error:", error);
-               // Handle error visually, e.g., show broken image icon or error message
-           };
-       } else {
-           // Handle non-image files if you allow them (though your accept attribute prevents this)
-           thumbnailElement.style.backgroundImage = null;
-           thumbnailElement.style.backgroundColor = '#cccccc'; // Generic background for non-images
-           thumbnailElement.dataset.label = `Non-image file: ${file.name}`; // Update label
-       }
-    }
+<br><br><br>
 
-</script> -->
-
-
-<!-- <script>
-    // Use a DataTransfer object to manage the list of files selected/dropped
-    const dataTransfer = new DataTransfer(); // Correctly declared as const
-
-    document.querySelectorAll(".drop-zone__input").forEach(inputElement => {
-        const dropZoneElement = inputElement.closest(".drop-zone");
-        const formElement = inputElement.form; // Get the parent form element
-
-        // Ensure the input starts with an empty file list managed by our DataTransfer object
-        inputElement.files = dataTransfer.files; // dataTransfer.files is empty initially
-
-        dropZoneElement.addEventListener("click", () => {
-            inputElement.click();
-        });
-
-        inputElement.addEventListener("change", function(){
-            console.log("Files selected via click:", this.files); // Log selected files
-            if (this.files.length > 0) {
-                // Clear previous files from DataTransfer if needed for single selections
-                // If you want to allow adding more files via multiple clicks, skip the clear
-                // dataTransfer.items.clear(); // <-- Uncomment if each click replaces previous selections
-
-                // Add selected files to our DataTransfer object
-                for (let i = 0; i < this.files.length; i++) {
-                    dataTransfer.items.add(this.files[i]);
-                }
-                // Assign the accumulated files from DataTransfer back to the input
-                inputElement.files = dataTransfer.files;
-                console.log("Input files after change:", inputElement.files);
-                updateDropZoneThumbnail(dropZoneElement, this.files[0]); // Still just previewing the first file
-            } else {
-                 // If selection is cancelled, clear the files entirely
-                 dataTransfer.items.clear(); // <-- CORRECT: Clear items in the existing object
-                 inputElement.files = dataTransfer.files; // Assign empty FileList
-                 console.log("Input files after change (cancelled):", inputElement.files);
-                 // Clear visual thumbnail and show prompt
-                 const thumbnailElement = dropZoneElement.querySelector(".drop-zone__thumb");
-                 if (thumbnailElement) thumbnailElement.remove();
-                 const promptElement = dropZoneElement.querySelector(".drop-zone__prompt");
-                 if (promptElement) promptElement.style.display = 'block'; // Show prompt again
-            }
-        });
-
-        dropZoneElement.addEventListener("dragover", e => {
-            e.preventDefault();
-            dropZoneElement.classList.add("drop-zone--over");
-        });
-
-        ["dragleave", "dragend"].forEach(type => {
-            dropZoneElement.addEventListener(type, e => {
-                dropZoneElement.classList.remove("drop-zone--over");
-            });
-        });
-
-        dropZoneElement.addEventListener("drop", e => {
-            e.preventDefault();
-            console.log("Files dropped:", e.dataTransfer.files); // Log dropped files
-            if (e.dataTransfer.files.length > 0) {
-                // Clear previous files from DataTransfer if needed for new drops replacing previous ones
-                // If you want to allow adding more files via multiple drops, skip the clear
-                // dataTransfer.items.clear(); // <-- Uncomment if each drop replaces previous selections
-
-                // Add dropped files to our DataTransfer object
-                 for (let i = 0; i < e.dataTransfer.files.length; i++) {
-                    dataTransfer.items.add(e.dataTransfer.files[i]);
-                }
-                // Assign the accumulated files from DataTransfer back to the input
-                inputElement.files = dataTransfer.files;
-                console.log("Input files after drop:", inputElement.files);
-                updateDropZoneThumbnail(dropZoneElement, inputElement.files[0]); // Preview the first of the *accumulated* files
-            } else {
-                 // If drop is empty, clear the files entirely
-                 dataTransfer.items.clear(); // <-- CORRECT: Clear items in the existing object
-                 inputElement.files = dataTransfer.files; // Assign empty FileList
-                 console.log("Input files after drop (empty):", inputElement.files);
-                 // Clear visual thumbnail and show prompt
-                 const thumbnailElement = dropZoneElement.querySelector(".drop-zone__thumb");
-                 if (thumbnailElement) thumbnailElement.remove();
-                 const promptElement = dropZoneElement.querySelector(".drop-zone__prompt");
-                 if (promptElement) promptElement.style.display = 'block'; // Show prompt again
-            }
-            dropZoneElement.classList.remove("drop-zone--over");
-        });
-
-        // Keep the check before submission for debugging
-        if (formElement) {
-            formElement.addEventListener('submit', function(event) {
-                // Temporarily prevent default submission for debugging
-                event.preventDefault();
-                console.log("--- Checking files before submission ---");
-                console.log("Input element:", inputElement);
-                console.log("Input element files property:", inputElement.files); // Check the property we are setting
-                console.log("Number of files attached:", inputElement.files ? inputElement.files.length : 0);
-                console.log("--- End file check ---");
-
-                // AFTER seeing the console output and confirming files are attached with correct Length:
-                // 1. REMOVE event.preventDefault(); from this submit listener function
-                // 2. The form will then submit normally.
-            });
-        }
-    });
-
-    // ... (updateDropZoneThumbnail function remains the same, ensure print is console.log) ...
-    function updateDropZoneThumbnail(dropZoneElement, file) {
-       let thumbnailElement = dropZoneElement.querySelector(".drop-zone__thumb");
-       const promptElement = dropZoneElement.querySelector(".drop-zone__prompt");
-
-       // Hide prompt if a file is provided
-       if (promptElement && file) {
-           promptElement.style.display = 'none';
-       }
-
-       // If no file is provided to the thumbnail function (e.g., clearing files), remove thumbnail
-       if (!file) {
-            if (thumbnailElement) thumbnailElement.remove();
-            // Show prompt again if thumbnail removed
-            if (promptElement) promptElement.style.display = 'block';
-            return; // Stop processing if no file
-       }
-
-
-       if (!thumbnailElement) {
-           thumbnailElement = document.createElement("div");
-           thumbnailElement.classList.add("drop-zone__thumb");
-           // Append thumbnail first so querySelector finds it next time
-           dropZoneElement.appendChild(thumbnailElement);
-       }
-
-       thumbnailElement.dataset.label = file.name;
-       console.log("File type:", file.type);
-
-       if (file.type && file.type.startsWith("image/")) { // Check file.type exists and starts with image/
-           const reader = new FileReader();
-           reader.readAsDataURL(file);
-           reader.onload = () => {
-               console.log("FileReader onload finished. Setting background.");
-               // console.log(reader.result.substring(0, 50)); // Optional: log part of base64 string
-               thumbnailElement.style.backgroundImage = `url('${reader.result}')`;
-               thumbnailElement.style.backgroundColor = ''; // Clear any default background
-           };
-           reader.onerror = (error) => {
-               console.error("FileReader error:", error);
-               // Handle error visually, e.g., show broken image icon or error message
-           };
-       } else {
-           // Handle non-image files if you allow them (though your accept attribute prevents this)
-           thumbnailElement.style.backgroundImage = null;
-           thumbnailElement.style.backgroundColor = '#cccccc'; // Generic background for non-images
-           thumbnailElement.dataset.label = `Non-image file: ${file.name}`; // Update label
-       }
-    }
-
-</script> -->
-
-{% for result in results %}
-    <h3>INDEX</h3>
-    {{ result.pair_index }}
-    <h3>IMAGE1_NAME</h3>
-    {{ result.image1_name }}
-    <h3>IMAGE2_NAME</h3>
-    {{ result.image2_name }}
-    <h3>FINAL_DECISION</h3>
-    {{ result.final_decision }}
-    <h3>CONFIDENCE_SCORE</h3>
-    {{ result.confidence_score }}
-    <h3>DISTANCE_SCORES</h3>
-    {{ result.original_distances }}
-
-{% endfor %}
-
-
-
+<a href="{% url 'uploader' %}">
+  <button>UPLOAD IMAGES</button>
+</a>
 
 
 <script>
-document.addEventListener('DOMContentLoaded', function () {
-    const dropZone = document.getElementById('drop-zone_image2');
-    const fileInput = document.querySelector('input[name="images"]');
-    
-    // This will store all files dropped
-    const dataTransfer = new DataTransfer();
-
-    // Highlight drop zone on dragover
-    dropZone.addEventListener('dragover', function (e) {
-        e.preventDefault();
-        dropZone.classList.add('dragover');
-    });
-
-    dropZone.addEventListener('dragleave', function (e) {
-        dropZone.classList.remove('dragover');
-    });
-
-    dropZone.addEventListener('drop', function (e) {
-        e.preventDefault();
-        dropZone.classList.remove('dragover');
-
-        const files = e.dataTransfer.files;
-
-        for (let i = 0; i < files.length; i++) {
-            dataTransfer.items.add(files[i]);
-        }
-
-        fileInput.files = dataTransfer.files;
-
-        updatePrompt();
-    });
-
-    // Support click-to-select
-    dropZone.addEventListener('click', () => fileInput.click());
-
-    // Support manually selecting files from file picker
-    fileInput.addEventListener('change', function () {
-        // Clear existing and add new files to dataTransfer
-        for (let i = 0; i < fileInput.files.length; i++) {
-            dataTransfer.items.add(fileInput.files[i]);
-        }
-        fileInput.files = dataTransfer.files;
-
-        updatePrompt();
-    });
-
-    function updatePrompt() {
-        const prompt = dropZone.querySelector('.drop-zone__prompt');
-        if (dataTransfer.files.length > 0) {
-            let names = [];
-            for (let i = 0; i < dataTransfer.files.length; i++) {
-                names.push(dataTransfer.files[i].name);
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.startsWith(name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
             }
-            prompt.innerHTML = 'Files added:<br>' + names.join('<br>');
-        } else {
-            prompt.textContent = "DRAG AND DROP OR CLICK TO UPLOAD IMAGE 2";
+            return cookieValue;
         }
     }
-});
+
+    const openGalleryButton = document.getElementById('open-gallery-button');
+    const form = document.getElementById('image-form');
+    const resultsContainer = document.getElementById('comparison-results-container');
+    const selectedImagesDisplay = document.getElementById('selected-images-display');
+
+    const modal = document.getElementById('image-gallery-modal');
+    const modalImageContainer = document.getElementById('modal-image-container');
+    const closeModalSpan = modal.querySelector(".close");
+    const confirmSelectionButton = document.getElementById('confirm-selection-button');
+
+    const prevPageButton = document.getElementById('prev-page-button');
+    const nextPageButton = document.getElementById('next-page-button');
+    const pageInfoSpan = document.getElementById('page-info');
+
+    let dbImagesData = [];
+    let selectedImageDatas = [];
+    let currentPage = 1;
+    const imagesPerPage = 100;
+    let totalPages = 1;
+
+    let selectedImageNamesAcrossPages = new Set();
+
+    let allImagesMap = {};
+
+    function updatePaginationControls() {
+        pageInfoSpan.textContent = `Page ${currentPage} of ${totalPages}`;
+        prevPageButton.disabled = currentPage === 1;
+        nextPageButton.disabled = currentPage === totalPages;
+    }
+
+    function displayModalImagePreviews(images) {
+        modalImageContainer.innerHTML = '';
+        dbImagesData = images;
+
+        if (dbImagesData && dbImagesData.length > 0) {
+            dbImagesData.forEach((imageData, index) => {
+                allImagesMap[imageData.name] = imageData;
+
+                const box = document.createElement('div');
+                box.className = 'img-box';
+                box.dataset.index = index;
+                box.dataset.imageName = imageData.name;
+
+                const img = document.createElement('img');
+                img.src = imageData.image;
+                img.alt = imageData.name;
+                box.appendChild(img);
+
+                if (selectedImageNamesAcrossPages.has(imageData.name)) {
+                    box.classList.add('selected');
+                }
+
+                box.addEventListener('click', () => {
+                    box.classList.toggle('selected');
+                    if (box.classList.contains('selected')) {
+                        selectedImageNamesAcrossPages.add(imageData.name);
+                    } else {
+                        selectedImageNamesAcrossPages.delete(imageData.name);
+                    }
+                    console.log("Current selected image names:", selectedImageNamesAcrossPages);
+                });
+                modalImageContainer.appendChild(box);
+            });
+        } else {
+            modalImageContainer.innerHTML = '<p>No images found in the database to display for this page.</p>';
+        }
+        updatePaginationControls();
+    }
+
+    function displaySelectedImagesOnMainPage() {
+        selectedImagesDisplay.innerHTML = '';
+        selectedImageDatas = Array.from(selectedImageNamesAcrossPages).map(name => {
+            return allImagesMap[name];
+        }).filter(Boolean);
+
+        if (selectedImageDatas && selectedImageDatas.length > 0) {
+            selectedImagesDisplay.innerHTML = '<h3>Selected Images for Comparison:</h3>';
+            selectedImageDatas.forEach(imageData => {
+                const box = document.createElement('div');
+                box.className = 'img-box selected';
+                const img = document.createElement('img');
+                img.src = imageData.image;
+                img.alt = imageData.name;
+                box.appendChild(img);
+                selectedImagesDisplay.appendChild(box);
+            });
+        } else {
+            selectedImagesDisplay.innerHTML = '<p>No images selected.</p>';
+        }
+    }
+
+    function loadAndDisplayImagesFromDB() {
+        resultsContainer.innerHTML = '';
+        selectedImagesDisplay.innerHTML = '<p>Loading gallery...</p>';
+        
+        modal.style.display = "flex";
+
+        fetch(`/list-db-images/?page=${currentPage}&limit=${imagesPerPage}`)
+            .then(res => {
+                if (res.ok) {
+                    return res.json();
+                } else {
+                    console.error('Failed to fetch image list:', res.status);
+                    modalImageContainer.innerHTML = '<p style="color: red;">Failed to fetch image list.</p>';
+                    selectedImagesDisplay.innerHTML = '<p style="color: red;">Failed to load gallery images.</p>';
+                    return res.text().then(text => { throw new Error(`Failed to fetch image list: ${res.status} - ${text}`); });
+                }
+            })
+            .then(data => {
+                console.log('JSON data received from /list-db-images/:', data);
+                currentPage = data.current_page;
+                totalPages = data.total_pages;
+                
+                if (data.images) {
+                    displayModalImagePreviews(data.images);
+                } else {
+                    console.error('JSON response does not contain an "images" list:', data);
+                    displayModalImagePreviews([]);
+                }
+                updatePaginationControls();
+            })
+            .catch(err => {
+                console.error('Error fetching images:', err);
+                modalImageContainer.innerHTML = '<p style="color: red;">Error loading images from server.</p>';
+                selectedImagesDisplay.innerHTML = '<p style="color: red;">Error loading gallery images.</p>';
+            });
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        if (openGalleryButton) {
+            openGalleryButton.addEventListener('click', () => {
+                currentPage = 1;
+                loadAndDisplayImagesFromDB();
+            });
+        } else {
+            console.error("Button with ID 'open-gallery-button' not found!");
+        }
+        selectedImagesDisplay.innerHTML = '<p>Select images from the gallery.</p>';
+        resultsContainer.innerHTML = '';
+    });
+
+    if (closeModalSpan) {
+        closeModalSpan.onclick = function() {
+            modal.style.display = "none";
+            displaySelectedImagesOnMainPage();
+        }
+    }
+
+    window.onclick = function(event) {
+        if (event.target == modal) {
+            modal.style.display = "none";
+            displaySelectedImagesOnMainPage();
+        }
+    }
+
+    if (confirmSelectionButton) {
+        confirmSelectionButton.addEventListener('click', () => {
+            modal.style.display = "none";
+            displaySelectedImagesOnMainPage();
+        });
+    }
+
+    if (prevPageButton) {
+        prevPageButton.addEventListener('click', () => {
+            if (currentPage > 1) {
+                currentPage--;
+                loadAndDisplayImagesFromDB();
+            }
+        });
+    }
+
+    if (nextPageButton) {
+        nextPageButton.addEventListener('click', () => {
+            if (currentPage < totalPages) {
+                currentPage++;
+                loadAndDisplayImagesFromDB();
+            }
+        });
+    }
+
+    form.addEventListener('submit', function (e) {
+        e.preventDefault();
+
+        if (selectedImageNamesAcrossPages.size === 0) {
+            alert('Please select images from the gallery first.');
+            return;
+        }
+        if (selectedImageNamesAcrossPages.size % 2 !== 0) {
+            alert('Please select an even number of images to form pairs.');
+            return;
+        }
+
+        const formData = new FormData();
+        Array.from(selectedImageNamesAcrossPages).forEach(imageName => {
+            formData.append('selected_image_paths[]', imageName);
+        });
+
+        const csrftoken = getCookie('csrftoken');
+        console.log('CSRF Token read by JS (inside submit):', csrftoken);
+        console.log('--- FormData Contents (Paths) ---');
+        for (let pair of formData.entries()) {
+            console.log(pair[0] + ', ' + pair[1]);
+        }
+        console.log('-------------------------------');
+
+        fetch('/compareurl/', {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-CSRFToken': csrftoken
+            }
+        })
+        .then(res => {
+            if (res.ok) {
+                return res.json();
+            } else {
+                console.error('Comparison fetch failed with status:', res.status);
+                return res.json().then(errorData => {
+                    console.error('Error details from server:', errorData);
+                    throw new Error(`Comparison failed with status ${res.status}: ${errorData.error || 'Unknown error'}`);
+                }).catch(() => {
+                    return res.text().then(text => { throw new Error(`Comparison failed with status ${res.status}. Server response: ${text.substring(0, 200) + '...'}`); });
+                });
+            }
+        })
+        .then(data => {
+            console.log('Comparison results received:', data);
+            if (resultsContainer) {
+                resultsContainer.innerHTML = '';
+                const resultsList = data.results;
+                if (resultsList && resultsList.length > 0) {
+                    resultsList.forEach(pairResult => {
+                        const pairResultDiv = document.createElement('div');
+                        pairResultDiv.classList.add('pair-result');
+                        pairResultDiv.innerHTML = `
+                            <h3>Pair ${pairResult.pair_index}: ${pairResult.image1_name} vs ${pairResult.image2_name}</h3>
+                            <p><strong>Decision:</strong> ${pairResult.final_decision}</p>
+                            <p><strong>Confidence Score:</strong> ${pairResult.confidence_score}</p>
+                            <p><strong>Distance Scores:</strong> ${JSON.stringify(pairResult.original_distances)}</p>
+                        `;
+                        if (pairResult.error) {
+                            const errorElement = document.createElement('p');
+                            errorElement.style.color = 'red';
+                            errorElement.textContent = `Error for this pair: ${pairResult.error}`;
+                            pairResultDiv.appendChild(errorElement);
+                        }
+                        resultsContainer.appendChild(pairResultDiv);
+                        const hr = document.createElement('hr');
+                        resultsContainer.appendChild(hr);
+                    });
+                } else {
+                    if (data.error) {
+                        resultsContainer.innerHTML = `<p style="color: red;">Error: ${data.error}</p>`;
+                        if (data.form_errors) {
+                            for (const field in data.form_errors) {
+                                resultsContainer.innerHTML += `<p style="color: red;">${field}: ${data.form_errors[field].join(', ')}</p>`;
+                            }
+                        }
+                    } else {
+                        resultsContainer.innerHTML = '<p>No comparison results to display.</p>';
+                    }
+                }
+            } else {
+                console.error("Results container element not found!");
+            }
+        })
+        .catch(err => {
+            alert("Error processing comparison");
+            console.error("Fetch or Comparison Error:", err);
+            if (resultsContainer) {
+                resultsContainer.innerHTML = `<p style="color: red;">An error occurred: ${err.message || 'Unknown error'}</p>`;
+            }
+        });
+    });
 </script>
-
-
-
-
-           
 
 </body>
 </html>
